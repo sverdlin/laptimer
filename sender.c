@@ -25,6 +25,7 @@
 #include "record.h"
 #include "timer.h"
 
+#define LAP_TIME_MIN	255	/* ms */
 #define LAP_FIFO_SIZE	64
 #define LAP_TIMER_FREQ	1000
 #define MAX_SW_RETR	16
@@ -115,20 +116,26 @@ ISR(INT6_vect)
 ISR(PCINT0_vect)
 {
 	struct lap *newlap = &lap_fifo[fifo_tail];
+	static __uint24 last_ts;
+	__uint24 ts;
 
 	/* Ignore falling edge */
 	if (!gpio_get_input(GPIO_PIN_SIGNAL))
 		return;
 
-	newlap->ts = get_timestamp();
-	newlap->id = get_address();
+	ts = get_timestamp();
+	if (ts - last_ts > LAP_TIME_MIN) {
+		newlap->ts = ts;
+		newlap->id = get_address();
 
-	/* Ensure that % LAP_FIFO_SIZE can be done with bitmasking */
-	fifo_tail = (fifo_tail + 1) % LAP_FIFO_SIZE +
-		    BUILD_BUG_ON_NOT_POWER_OF_2(LAP_FIFO_SIZE);
-	if (unlikely(fifo_tail == fifo_head))
-		fifo_overflow = true;
-	sw_retr_cnt = 0;
+		/* Ensure that % LAP_FIFO_SIZE can be done with bitmasking */
+		fifo_tail = (fifo_tail + 1) % LAP_FIFO_SIZE +
+			    BUILD_BUG_ON_NOT_POWER_OF_2(LAP_FIFO_SIZE);
+		if (unlikely(fifo_tail == fifo_head))
+			fifo_overflow = true;
+		sw_retr_cnt = 0;
+	}
+	last_ts = ts;
 }
 
 ISR(TIMER0_COMPA_vect)
