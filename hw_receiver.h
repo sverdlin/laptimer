@@ -7,7 +7,7 @@
 
 #include "gpio.h"
 
-#define F_CPU		16000000
+#define F_CPU		8000000
 
 #define GPIO_PIN_CS	GPIO_PIN_B0
 #define GPIO_PIN_CE	GPIO_PIN_D5
