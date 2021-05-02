@@ -168,6 +168,11 @@ static void radio_interrupt_poll(void)
 
 static void sleep_in_main_loop(void)
 {
+	static bool printed;
+
+	if (!printed)
+		printed = printf_P(PSTR("VER %x.%02x\n"), (uint8_t)(USB_PRODUCT_RELEASE >> 8), (uint8_t)USB_PRODUCT_RELEASE) > 0;
+
 	/*
 	 * It's important that we go to sleep before INT6 is served
 	 * otherwise we miss it and will not be woken up.
