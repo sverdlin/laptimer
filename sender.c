@@ -280,6 +280,15 @@ static void try_transmit(void)
 	}
 }
 
+static void event_power_up(void)
+{
+	struct lap buf;
+
+	buf.id = get_address() + ID_COUNT * 2;
+	buf.ts = 0;
+	radio_transmit((uint8_t *)&buf, sizeof(buf));
+}
+
 static void sleep_in_main_loop(void)
 {
 	/*
@@ -305,6 +314,7 @@ int main(void)
 	sleep_enable();
 
 	radio_cfg();
+	event_power_up();
 
 	for (;;) {
 		radio_interrupt_poll();

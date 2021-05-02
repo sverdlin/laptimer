@@ -140,6 +140,10 @@ static void process_incoming_pkt(void)
 		/* Retries in last transmission */
 		printf_P(PSTR("RET %u %u\n"), ret, (uint8_t)newlap.ts);
 		break;
+	case 2:
+		/* Power up event */
+		printf_P(PSTR("PWR %u\n"), ret);
+		break;
 	}
 }
 
