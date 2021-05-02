@@ -119,8 +119,8 @@ ISR(PCINT0_vect)
 	static __uint24 last_ts;
 	__uint24 ts;
 
-	/* Ignore falling edge */
-	if (!gpio_get_input(GPIO_PIN_SIGNAL))
+	/* Ignore rising edge */
+	if (gpio_get_input(GPIO_PIN_SIGNAL))
 		return;
 
 	ts = get_timestamp();
