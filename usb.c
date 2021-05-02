@@ -43,10 +43,10 @@
 #define CDC_ACM_INTERVAL	64
 
 #define CDC_RX_ENDPOINT		3
-#define CDC_RX_SIZE		32
+#define CDC_RX_SIZE		16
 
 #define CDC_TX_ENDPOINT		4
-#define CDC_TX_SIZE		32
+#define CDC_TX_SIZE		64
 
 #define USB_MAX_ENDPOINT	4
 
@@ -76,7 +76,7 @@ static const __flash struct ep_config_entry ep_config_tab[] = {
 	{
 		.ep	= CDC_RX_ENDPOINT,
 		.cfg0	= EP_BULK & EP_DIR_OUT,
-		.cfg1	= EP_SIZE(CDC_RX_SIZE) | EP_BANKS(2) | BIT(ALLOC),
+		.cfg1	= EP_SIZE(CDC_RX_SIZE) | EP_BANKS(1) | BIT(ALLOC),
 	},
 	{
 		.ep	= CDC_TX_ENDPOINT,
