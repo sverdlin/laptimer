@@ -427,7 +427,9 @@ int8_t usb_cdc_drain(void)
 
 static bool usb_cur_txbuf_avail(void)
 {
-	return UEINTX & BIT(RWAL);
+	uint8_t t = UEINTX;
+
+	return (t & BIT(RWAL)) && (t & BIT(FIFOCON));
 }
 
 static bool usb_txbuf_avail(uint8_t ep)
