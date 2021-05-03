@@ -189,6 +189,9 @@ static void sleep_in_main_loop(void)
 
 static int usb_putchar(char c, FILE *stream)
 {
+	if (c == '\n' && usb_cdc_putchar('\r'))
+		return -1;
+
 	if (usb_cdc_putchar(c))
 		return -1;
 
