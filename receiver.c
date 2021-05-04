@@ -108,16 +108,17 @@ static void radio_cfg(void)
 	gpio_cfg_output(GPIO_PIN_CE, 1);
 }
 
+static uint16_t received_mask;
+
 static void process_lap(uint8_t addr, __uint24 ts)
 {
 	uint16_t mask = BIT(addr);
-	static uint16_t received;
 	static __uint24 tss[ID_COUNT];
 
-	if (received & mask && tss[addr] != ts) {
+	if ((received_mask & mask) && tss[addr] != ts) {
 		printf_P(PSTR("LAP %u %lu\n"), addr, (unsigned long)(ts - tss[addr]));
 	}
-	received |= mask;
+	received_mask |= mask;
 	tss[addr] = ts;
 }
 
@@ -143,6 +144,8 @@ static void process_incoming_pkt(void)
 	case 2:
 		/* Power up event */
 		printf_P(PSTR("PWR %u\n"), ret);
+		/* Skip next lap after power outage */
+		received_mask &= ~BIT(ret);
 		break;
 	}
 }
