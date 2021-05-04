@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2020 Alexander Sverdlin
+ * Copyright (C) 2020-2021 Alexander Sverdlin
  */
 
 #ifndef _MISC_H_

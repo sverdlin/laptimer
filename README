@@ -1,0 +1,107 @@
+
+                                LAPTIMER
+
+Firmware for wireless laptimer system. The system contains of a sender and a
+receiver, both containing an RFM75 wireless module and an ATmega8u2
+microcontroller.
+
+To build the firmware one requires GNU Make, avr-gcc, avr-binutils and avr-libc
+packages. Makefile is also prepared to flash the microcontrollers using avrdude
+software and AVR-ISP-MK2 programmer (OLIMEX).
+
+To build the firmware just type
+
+        make
+
+To flash the firmware, type either
+
+        make program-receiver
+
+or
+
+        make program-sender
+
+
+        SYSTEM SPECS
+
+RF Channel:             78 (2478MHz)
+TX Power:               4dBm (2.5mW)
+Air data rate:          250Kbps
+Number of pipes:        6
+Number of transmitters: 16
+Retransmission:         automatic, with acknowledgement
+Reception distance:     100-125m
+PC Interface:           USB, Communication Device Class
+Lap buffer:             up to 32 entries (before receiver acknowledges the reception)
+
+
+        LED INDICATION
+
+Receiver LEDs:
+
+        +---------------+---------------------------------------------------------------+
+        | LED           | Function                                                      |
+        +---------------+---------------------------------------------------------------+
+        | Green (#1)    |                                                               |
+        +---------------+---------------------------------------------------------------+
+        | Yellow (#2)   | blinks 8Hz:   Failed to configure/detect Radio Module         |
+        |               | constant:     Radio Module malfunction (interrupt flood)      |
+        +---------------+---------------------------------------------------------------+
+
+Transmitter LEDs:
+
+        +---------------+-----------------------------------------------------------------------+
+        | LED           | Function                                                              |
+        +---------------+-----------------------------------------------------------------------+
+        | Green (D4)    | single blinks:        packet transmitted                              |
+        +---------------+-----------------------------------------------------------------------+
+        | Yellow (D5)   | blinks 1Hz:           FIFO overflow (no ACK from receiver)            |
+        |               | blinks 8Hz:           Failed to configure/detect Radio Module         |
+        |               | constant:             Radio Module malfunction (interrupt flood)      |
+        +---------------+-----------------------------------------------------------------------+
+
+
+        RECEIVER PROTOCOL
+
+On the receiver side USB interface is used to connect to PC for data acquision
+and display. Standard Communication Device Class is implemented in the receiver
+firmware, which allows for usage of the standard OS drivers for USB-serial
+adapters. The USB Product ID (PID) was sublicensed from Microchip (VID 0x04D8)
+and is 0xEB86.
+
+The application protocol is a simple text form consisting of lines of data
+separated by <CR><LF> combination. Each line has a form:
+
+<key> <parameter-1> ... [parameter-n]
+
+Once after power up, on the first USB enumeration the receiver transmits the
+following line:
+
+VER <version>
+
+where <version> is the firmware version. This is done mainly for diagnostic
+purposes.
+
+Every time a sender is being powered, the receiver reports:
+
+PWR <address>
+
+where <address> is the address of the sender set by address switch, in the range
+0 to 15.
+
+Every time the sender receives a timing synchronisation signal, the receiver
+prints:
+
+LAP <address> <laptime>
+
+where <address> is the address of the sender set by address switch and <laptime>
+is the number of milliseconds elapsed from the last synchronisation signal
+(passing the light gate).
+
+For the purposes of signal quality monitoring sender can report the number of
+retransmissions to the receiver, which is then reported as:
+
+RET <address> <retr>
+
+where <retr> is the number of retransmissions required to transmit the last
+lap time.
