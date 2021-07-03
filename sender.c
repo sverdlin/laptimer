@@ -25,7 +25,7 @@
 #include "record.h"
 #include "timer.h"
 
-#define LAP_TIME_MIN	255	/* ms */
+#define LAP_TIME_MIN	10000	/* ms */
 #define LAP_FIFO_SIZE	64
 #define LAP_TIMER_FREQ	1000
 #define MAX_SW_RETR	16
