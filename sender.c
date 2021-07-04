@@ -124,17 +124,18 @@ ISR(PCINT0_vect)
 		return;
 
 	ts = get_timestamp();
-	if (ts - last_ts > LAP_TIME_MIN) {
-		newlap->ts = ts;
-		newlap->id = get_address();
+	if (ts - last_ts < LAP_TIME_MIN)
+		return;
 
-		/* Ensure that % LAP_FIFO_SIZE can be done with bitmasking */
-		fifo_tail = (fifo_tail + 1) % LAP_FIFO_SIZE +
-			    BUILD_BUG_ON_NOT_POWER_OF_2(LAP_FIFO_SIZE);
-		if (unlikely(fifo_tail == fifo_head))
-			fifo_overflow = true;
-		sw_retr_cnt = 0;
-	}
+	newlap->ts = ts;
+	newlap->id = get_address();
+
+	/* Ensure that % LAP_FIFO_SIZE can be done with bitmasking */
+	fifo_tail = (fifo_tail + 1) % LAP_FIFO_SIZE +
+		    BUILD_BUG_ON_NOT_POWER_OF_2(LAP_FIFO_SIZE);
+	if (unlikely(fifo_tail == fifo_head))
+		fifo_overflow = true;
+	sw_retr_cnt = 0;
 	last_ts = ts;
 }
 
