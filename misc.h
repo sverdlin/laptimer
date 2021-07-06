@@ -41,5 +41,8 @@
 #define unlikely(x)	__builtin_expect (!!(x), 0)
 
 #define __maybe_unused	__attribute__((unused))
+#define __always_inline	inline __attribute__((__always_inline__))
+
+#define barrier() __asm__ __volatile__("": : :"memory")
 
 #endif /* _MISC_H_ */

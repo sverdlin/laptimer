@@ -26,7 +26,7 @@
 #include "timer.h"
 
 #define LAP_TIME_MIN	10000	/* ms */
-#define LAP_FIFO_SIZE	64
+#define LAP_FIFO_SIZE	32
 #define LAP_TIMER_FREQ	1000
 #define MAX_SW_RETR	16
 
@@ -40,7 +40,7 @@ FUSES = {
 };
 
 volatile static uint8_t sw_retr_cnt;
-static struct lap lap_fifo[LAP_FIFO_SIZE];
+static struct lap lap_fifo[LAP_FIFO_SIZE + BUILD_BUG_ON_ZERO(sizeof(struct lap) > 32)];
 volatile static uint8_t fifo_head, fifo_tail;
 volatile static __uint24 tmr1ms;
 static bool last_packet_lap;
@@ -95,6 +95,111 @@ static uint8_t get_address(void)
 	return ~a;
 }
 
+#define IMPULSE_US	6538
+#define CARRIER_PERIOD	(F_CPU / 1000000 * IMPULSE_US)
+static void signal_tmr_cfg(void)
+{
+	/* Timer period */
+	OCR1A = TMR1OCR(CARRIER_PERIOD);
+	/* Clear Timer on Compare Match */
+	TCCR1B = BIT(WGM12);
+	/* Compare Match A Interrupt Enable */
+	TIMSK1 |= BIT(OCIE1A);
+}
+
+static void signal_tmr_enable(void)
+{
+	TCCR1B |= TMR1PREBITS(CARRIER_PERIOD);
+}
+
+static void signal_tmr_disable(void)
+{
+	TCCR1B &= ~(BIT(CS12) | BIT(CS11) | BIT(CS10));
+}
+
+static uint16_t last_signal_tmr;
+
+static void signal_tmr_clr(void)
+{
+	TCNT1 = 0;
+	last_signal_tmr = 0;
+}
+
+static uint16_t signal_tmr_val(void)
+{
+	return TCNT1;
+}
+
+/* Accumulators for Fourier transform */
+static int32_t acc_a, acc_b, prev_acc_a, prev_acc_b;
+/* Walsh function values */
+static uint8_t v_a, v_b;
+/* Rest time before above function value changes */
+static uint16_t rest_a, rest_b;
+
+static void signal_acc_clr(void)
+{
+	acc_a = 0;
+	acc_b = 0;
+	prev_acc_a = 0;
+	prev_acc_b = 0;
+	v_a = 0;
+	v_b = 0;
+	rest_a = CARRIER_PERIOD / 2;
+	rest_b = CARRIER_PERIOD / 4;
+}
+
+static __always_inline void signal_fourier_loop(int32_t *acc, uint8_t *v, uint8_t s, uint16_t *rest, uint16_t time)
+{
+	while (time) {
+		if (time >= *rest) {
+			time -= *rest;
+			if (s ^ *v)
+				*acc -= *rest;
+			else
+				*acc += *rest;
+			*v ^= 1;
+			*rest = CARRIER_PERIOD / 2;
+		} else {
+			*rest -= time;
+			if (s ^ *v)
+				*acc -= time;
+			else
+				*acc += time;
+			time = 0;
+		}
+	}
+}
+
+static void signal_fourier_run(uint8_t signal)
+{
+	uint16_t ts = signal_tmr_val();
+	__int24 tmp = ts - last_signal_tmr;
+
+	last_signal_tmr = ts;
+	if (tmp < 0)
+		tmp += CARRIER_PERIOD;
+
+	signal_fourier_loop(&acc_a, &v_a, signal, &rest_a, tmp);
+	signal_fourier_loop(&acc_b, &v_b, signal, &rest_b, tmp);
+}
+
+#define SIGNAL_THRESHOLD	1673658368
+static bool signal_detect(uint8_t signal)
+{
+	signal_fourier_run(signal);
+
+	prev_acc_a += acc_a;
+	prev_acc_b += acc_b;
+
+	if ((int64_t)prev_acc_a * prev_acc_a + (int64_t)prev_acc_b * prev_acc_b >= SIGNAL_THRESHOLD)
+		return true;
+
+	prev_acc_a = acc_a;
+	prev_acc_b = acc_b;
+	return false;
+}
+
 static void radio_interrupt_enable(void)
 {
 	/* The low level of INT6 generates an interrupt request */
@@ -112,22 +217,50 @@ ISR(INT6_vect)
 	radio_interrupt_disable();
 }
 
+static __uint24 last_lap_ts;
+static bool last_lap_valid;
+static __uint24 lap_ts;
+/*
+ * If there was a pin state change within 153Hz period, first
+ * captured timestamp is still valid.
+ */
+static bool lap_ts_valid;
+static bool pin_change;
+
 /* Light signal, PCINT4 */
 ISR(PCINT0_vect)
 {
-	struct lap *newlap = &lap_fifo[fifo_tail];
-	static __uint24 last_ts;
-	__uint24 ts;
+	signal_tmr_enable();
+	signal_fourier_run(!gpio_get_input(GPIO_PIN_SIGNAL));
 
-	/* Ignore falling edge */
-	if (!gpio_get_input(GPIO_PIN_SIGNAL))
+	pin_change = true;
+	if (lap_ts_valid)
 		return;
 
-	ts = get_timestamp();
-	if (ts - last_ts < LAP_TIME_MIN)
+	lap_ts = get_timestamp();
+}
+
+ISR(TIMER1_COMPA_vect)
+{
+	struct lap *newlap;
+
+	if (!pin_change) {
+		lap_ts_valid = false;
+		signal_acc_clr();
+		signal_tmr_disable();
+		signal_tmr_clr();
+		return;
+	}
+	pin_change = false;
+
+	if (!signal_detect(gpio_get_input(GPIO_PIN_SIGNAL)))
 		return;
 
-	newlap->ts = ts;
+	if (last_lap_valid && (lap_ts - last_lap_ts < LAP_TIME_MIN))
+		return;
+
+	newlap = &lap_fifo[fifo_tail];
+	newlap->ts = lap_ts;
 	newlap->id = get_address();
 
 	/* Ensure that % LAP_FIFO_SIZE can be done with bitmasking */
@@ -136,8 +269,10 @@ ISR(PCINT0_vect)
 	if (unlikely(fifo_tail == fifo_head))
 		fifo_overflow = true;
 	sw_retr_cnt = 0;
-	last_ts = ts;
+	last_lap_ts = lap_ts;
+	last_lap_valid = true;
 }
+ISR(TIMER1_OVF_vect, ISR_ALIASOF(TIMER1_COMPA_vect));
 
 ISR(TIMER0_COMPA_vect)
 {
@@ -160,7 +295,7 @@ static void lap_timer_cfg(void)
 static void power_cfg(void)
 {
 	power_ac_disable();
-	power_timer1_disable();
+	power_timer1_enable();
 	power_usart1_disable();
 	power_usb_disable();
 }
@@ -308,6 +443,8 @@ int main(void)
 	power_cfg();
 	gpio_cfg();
 	lap_timer_cfg();
+	signal_acc_clr();
+	signal_tmr_cfg();
 
 	spi_config(GPIO_PIN_CS, SPI_CLK_CFG(RFM75_MAX_SPI_CLK));
 
