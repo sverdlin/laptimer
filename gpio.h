@@ -7,6 +7,8 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <avr/io.h>
+#include "misc.h"
 
 #define GPIO_PIN_B0	0x00
 #define GPIO_PIN_B1	0x01
@@ -33,10 +35,71 @@
 #define GPIO_PIN_D6	0x16
 #define GPIO_PIN_D7	0x17
 
-void gpio_cfg_output(uint8_t pin, bool initial_state);
-void gpio_cfg_input(uint8_t pin, bool pullup);
-void gpio_set_output(uint8_t pin, bool state);
-bool gpio_get_input(uint8_t pin);
-void gpio_unused(const __flash uint8_t *pins, uint8_t count);
+static volatile uint8_t *const gpio_ports[] = {
+	&PORTB,
+	&PORTC,
+	&PORTD,
+};
+static volatile uint8_t *const gpio_ddrs[] = {
+	&DDRB,
+	&DDRC,
+	&DDRD,
+};
+static volatile uint8_t *const gpio_pins[] = {
+	&PINB,
+	&PINC,
+	&PIND,
+};
+
+#define PINBANK(pin)	((pin) / 8)
+#define PORTx(pin)	(*gpio_ports[PINBANK(pin)])
+#define DDRx(pin)	(*gpio_ddrs[PINBANK(pin)])
+#define PINx(pin)	(*gpio_pins[PINBANK(pin)])
+#define PINBIT(pin)	((pin) & 7)
+
+static __maybe_unused void gpio_cfg_output(uint8_t pin, bool initial_state)
+{
+	uint8_t mask = BIT(PINBIT(pin));
+	uint8_t nmask = ~mask;
+
+	if (initial_state)
+		PORTx(pin) |= mask;
+	else
+		PORTx(pin) &= nmask;
+
+	DDRx(pin) |= mask;
+}
+
+static __maybe_unused void gpio_cfg_input(uint8_t pin, bool pullup)
+{
+	uint8_t mask = BIT(PINBIT(pin));
+	uint8_t nmask = ~mask;
+
+	DDRx(pin) &= nmask;
+
+	if (pullup)
+		PORTx(pin) |= mask;
+	else
+		PORTx(pin) &= nmask;
+}
+
+static __maybe_unused void gpio_set_output(uint8_t pin, bool state)
+{
+	if (state)
+		PORTx(pin) |= BIT(PINBIT(pin));
+	else
+		PORTx(pin) &= ~BIT(PINBIT(pin));
+}
+
+static __maybe_unused bool gpio_get_input(uint8_t pin)
+{
+	return PINx(pin) & BIT(PINBIT(pin));
+}
+
+static __maybe_unused void gpio_unused(const __flash uint8_t *pins, uint8_t count)
+{
+	while (count--)
+		gpio_cfg_input(*pins++, true);
+}
 
 #endif /* _GPIO_H_ */

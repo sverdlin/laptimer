@@ -7,7 +7,7 @@
 MCU = atmega8u2
 FORMAT = ihex
 TARGET = sender receiver
-COBJ := gpio.o rfm75.o spi.o
+COBJ := rfm75.o spi.o
 SOBJ := sender.o $(COBJ)
 ROBJ := receiver.o $(COBJ) usb.o
 OPT = s
