@@ -62,7 +62,7 @@ MATH_LIB =
 
 LDMAPS = -Wl,-Map=sender.map,--cref
 LDMAPR = -Wl,-Map=receiver.map,--cref
-LDFLAGS = $(LDMAP) $(PRINTF_LIB) $(SCANF_LIB) $(MATH_LIB) -Wl,--gc-sections
+LDFLAGS = $(LDMAP) $(PRINTF_LIB) $(SCANF_LIB) $(MATH_LIB) -Wl,--gc-sections,--defsym=__TEXT_REGION_LENGTH__=8192,--defsym=__DATA_REGION_LENGTH__=384
 
 
 # Programming support using avrdude. Settings and variables.
